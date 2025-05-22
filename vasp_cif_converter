@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+import sys
+from pymatgen.core import Structure
+from pymatgen.io.vasp import Poscar
+from pymatgen.io.cif import CifWriter
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+
+def cif_to_poscar(cif_file):
+    try:
+        structure = Structure.from_file(cif_file)
+        poscar = Poscar(structure)
+        poscar.write_file("POSCAR")
+        print(f"✅ POSCAR generated from {cif_file}")
+    except Exception as e:
+        print(f"❌ Error converting CIF → POSCAR: {e}")
+
+def poscar_to_symmetrized_cif(poscar_file, output_cif_file=None, symprec=1e-2):
+    try:
+        structure = Poscar.from_file(poscar_file).structure
+
+        sga = SpacegroupAnalyzer(structure, symprec=symprec)
+        symmetrized_structure = sga.get_refined_structure()
+
+        if output_cif_file is None:
+            output_cif_file = poscar_file + ".symmetrized.cif"
+
+        writer = CifWriter(symmetrized_structure, symprec=symprec)
+        writer.write_file(output_cif_file)
+        print(symprec)
+        print(f"✅ Symmetrized CIF written to: {output_cif_file}")
+        print(f"📐 Detected space group: {sga.get_space_group_symbol()} ({sga.get_space_group_number()})")
+    except Exception as e:
+        print(f"❌ Error converting POSCAR → CIF: {e}")
+
+if __name__ == "__main__":
+    argc = len(sys.argv)
+    if argc < 2:
+        print("Usage: python vasp_cif_converter.py <cif_file|POSCAR|CONTCAR> [output_cif_file] [symprec]")
+    else:
+        filename = sys.argv[1].strip()
+        output_file = sys.argv[2] if argc > 2 else None
+        symprec = float(sys.argv[3]) if argc > 3 else 1e-2
+
+        if filename.lower().endswith(".cif"):
+            cif_to_poscar(filename)
+        elif filename.upper() in ["POSCAR", "CONTCAR"] or filename.endswith(".vasp"):
+            poscar_to_symmetrized_cif(filename, output_file, symprec)
+        else:
+            print("Unrecognized file format. Please provide a .cif or POSCAR/CONTCAR file.")
